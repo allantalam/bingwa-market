@@ -37,7 +37,19 @@ The goal is to build a trusted marketplace connecting customers with genuine Bin
 - M-Pesa Daraja API integration for secure payment processing.
 - Purchase history and transaction tracking.
 - Improved reporting and offer verification tools.
+## App Screenshots
 
+### Browse Offers
+![Bingwa Market Home](screenshots/browse-offers.png)
+
+### Offer Details
+![Offer Details](screenshots/offer-details.png)
+
+### M-Pesa Purchase
+![M-Pesa Purchase](screenshots/mpesa-purchase.png)
+
+### Bingwa Registration
+![Bingwa Registration](screenshots/bingwa-registration.png)
 ## Current Development Status
 
 The project is currently in the UI prototype and frontend development stage.
