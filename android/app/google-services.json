@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "782392350823",
+    "project_id": "bingwa-market",
+    "storage_bucket": "bingwa-market.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:782392350823:android:0b3a096b1ebc0bc6b65cc2",
+        "android_client_info": {
+          "package_name": "com.mycompany.bingwamarket"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAC-mugZa3Vfb6hFS03lhdjpc-4Sx1VXKY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
