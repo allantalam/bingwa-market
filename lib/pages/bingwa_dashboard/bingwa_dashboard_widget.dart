@@ -1,6 +1,7 @@
 import '/components/button/button_widget.dart';
 import '/components/dash_stat/dash_stat_widget.dart';
 import '/components/offer_status_row/offer_status_row_widget.dart';
+import '/pages/submit_offer/submit_offer_widget.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -335,6 +336,9 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                         fullWidth: true,
                         loading: false,
                         disabled: false,
+                        onTap: () {
+                          context.goNamed(SubmitOfferWidget.routeName);
+                        },
                       ),
                     ),
                     wrapWithModel(

@@ -56,3 +56,9 @@ ios/Pods/
 .env
 .env.*
 !.env.example
+# Android generated files
+/android/build/
+/android/settings.gradle.backup
+
+# Nested backup clone
+/bingwa-market/

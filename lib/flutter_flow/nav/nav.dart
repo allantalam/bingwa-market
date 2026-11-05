@@ -1,16 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
 
-import '/main.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/lat_lng.dart';
-import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'serialization_util.dart';
 
 import '/index.dart';
 
@@ -40,62 +33,67 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => SplashScreenWidget(),
+      errorBuilder: (context, state) => const SplashScreenWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => SplashScreenWidget(),
+          builder: (context, _) => const SplashScreenWidget(),
         ),
         FFRoute(
           name: SplashScreenWidget.routeName,
           path: SplashScreenWidget.routePath,
-          builder: (context, params) => SplashScreenWidget(),
+          builder: (context, params) => const SplashScreenWidget(),
         ),
         FFRoute(
           name: BrowseOffersWidget.routeName,
           path: BrowseOffersWidget.routePath,
-          builder: (context, params) => BrowseOffersWidget(),
+          builder: (context, params) => const BrowseOffersWidget(),
         ),
         FFRoute(
           name: OfferDetailsWidget.routeName,
           path: OfferDetailsWidget.routePath,
-          builder: (context, params) => OfferDetailsWidget(),
+          builder: (context, params) => const OfferDetailsWidget(),
         ),
         FFRoute(
           name: MPesaPurchaseScreenWidget.routeName,
           path: MPesaPurchaseScreenWidget.routePath,
-          builder: (context, params) => MPesaPurchaseScreenWidget(),
+          builder: (context, params) => const MPesaPurchaseScreenWidget(),
         ),
         FFRoute(
           name: BecomeABingwaWidget.routeName,
           path: BecomeABingwaWidget.routePath,
-          builder: (context, params) => BecomeABingwaWidget(),
+          builder: (context, params) => const BecomeABingwaWidget(),
+        ),
+        FFRoute(
+          name: SubmitOfferWidget.routeName,
+          path: SubmitOfferWidget.routePath,
+          builder: (context, params) => const SubmitOfferWidget(),
         ),
         FFRoute(
           name: BingwaDashboardWidget.routeName,
           path: BingwaDashboardWidget.routePath,
-          builder: (context, params) => BingwaDashboardWidget(),
+          builder: (context, params) => const BingwaDashboardWidget(),
         ),
         FFRoute(
           name: AdminOverviewWidget.routeName,
           path: AdminOverviewWidget.routePath,
-          builder: (context, params) => AdminOverviewWidget(),
+          builder: (context, params) => const AdminOverviewWidget(),
         ),
         FFRoute(
           name: AdminApprovalQueueWidget.routeName,
           path: AdminApprovalQueueWidget.routePath,
-          builder: (context, params) => AdminApprovalQueueWidget(),
+          builder: (context, params) => const AdminApprovalQueueWidget(),
         ),
         FFRoute(
           name: SavedOffersWidget.routeName,
           path: SavedOffersWidget.routePath,
-          builder: (context, params) => SavedOffersWidget(),
+          builder: (context, params) => const SavedOffersWidget(),
         ),
         FFRoute(
           name: ReportOfferWidget.routeName,
           path: ReportOfferWidget.routePath,
-          builder: (context, params) => ReportOfferWidget(),
+          builder: (context, params) => const ReportOfferWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
@@ -226,6 +224,7 @@ class FFRoute {
                   name: state.name,
                   child: child,
                   transitionDuration: transitionInfo.duration,
+                  reverseTransitionDuration: transitionInfo.duration,
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) =>
                           PageTransition(
@@ -265,7 +264,8 @@ class TransitionInfo {
   final Duration duration;
   final Alignment? alignment;
 
-  static TransitionInfo appDefault() => TransitionInfo(hasTransition: false);
+  static TransitionInfo appDefault() =>
+      const TransitionInfo(hasTransition: false);
 }
 
 class RootPageContext {
