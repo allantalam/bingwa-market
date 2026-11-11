@@ -1,11 +1,9 @@
+
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:percent_indicator/percent_indicator.dart';
-import 'package:provider/provider.dart';
 import 'splash_screen_model.dart';
 import '/index.dart';
 export 'splash_screen_model.dart';
@@ -26,21 +24,20 @@ class _SplashScreenWidgetState extends State<SplashScreenWidget> {
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
-void initState() {
-  super.initState();
-  _model = createModel(context, () => SplashScreenModel());
+  void initState() {
+    super.initState();
+    _model = createModel(context, () => SplashScreenModel());
 
-  Future.delayed(const Duration(seconds: 3), () {
-    if (mounted) {
-      context.goNamed(BrowseOffersWidget.routeName);
-    }
-  });
-}
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        context.goNamed(BrowseOffersWidget.routeName);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _model.dispose();
-
     super.dispose();
   }
 
@@ -53,151 +50,70 @@ void initState() {
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        backgroundColor: const Color(0xFF004D32),
         body: Stack(
-          alignment: AlignmentDirectional(-1.0, -1.0),
+          alignment: AlignmentDirectional.center,
           children: [
             Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF1A237E), Color(0xFF0D47A1)],
-                  stops: [0.0, 1.0],
-                  begin: AlignmentDirectional(0.0, -1.0),
-                  end: AlignmentDirectional(0, 1.0),
+                  colors: [
+                    Color(0xFF004D32),
+                    Color(0xFF007A4D),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
-                shape: BoxShape.rectangle,
               ),
             ),
-            Container(
-              alignment: AlignmentDirectional(0.0, 0.0),
+            Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 120.0,
-                    height: 120.0,
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context).secondaryBackground,
-                      borderRadius: BorderRadius.circular(32.0),
-                      shape: BoxShape.rectangle,
-                    ),
-                    alignment: AlignmentDirectional(0.0, 0.0),
-                    child: Icon(
-                      Icons.shopping_bag_rounded,
-                      color: FlutterFlowTheme.of(context).secondary,
-                      size: 64.0,
+                  Image.asset(
+                    'assets/images/bingwa_logo.png',
+                    width: 250,
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Kenya's Bundle Marketplace",
+                    style: GoogleFonts.inter(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Bingwa Market',
-                        style: FlutterFlowTheme.of(context)
-                            .headlineLarge
-                            .override(
-                              font: GoogleFonts.plusJakartaSans(
-                                fontWeight: FontWeight.w800,
-                                fontStyle: FlutterFlowTheme.of(context)
-                                    .headlineLarge
-                                    .fontStyle,
-                              ),
-                              color: FlutterFlowTheme.of(context).onBackground,
-                              letterSpacing: 0.0,
-                              fontWeight: FontWeight.w800,
-                              fontStyle: FlutterFlowTheme.of(context)
-                                  .headlineLarge
-                                  .fontStyle,
-                              lineHeight: 1.2,
-                            ),
-                      ),
-                      Text(
-                        'Kenya\'s Bundle Marketplace',
-                        style: FlutterFlowTheme.of(context).bodyMedium.override(
-                              font: GoogleFonts.inter(
-                                fontWeight: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .fontWeight,
-                                fontStyle: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .fontStyle,
-                              ),
-                              color:
-                                  FlutterFlowTheme.of(context).onBackground80,
-                              letterSpacing: 0.0,
-                              fontWeight: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .fontWeight,
-                              fontStyle: FlutterFlowTheme.of(context)
-                                  .bodyMedium
-                                  .fontStyle,
-                              lineHeight: 1.5,
-                            ),
-                      ),
-                    ].divide(SizedBox(height: 4.0)),
-                  ),
-                ].divide(SizedBox(height: 24.0)),
+                ],
               ),
             ),
             Align(
-              alignment: AlignmentDirectional(0.0, 1.0),
-              child: Container(
-                child: Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 80.0),
-                  child: Container(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        CircularPercentIndicator(
-                          percent: 0.0,
-                          radius: 12.0,
-                          lineWidth: 3.0,
-                          animation: true,
-                          animateFromLastPercent: true,
-                          progressColor: Colors.green,
-                          backgroundColor:
-                              FlutterFlowTheme.of(context).alternate,
-                        ),
-                        Text(
-                          'Loading best offers...',
-                          style: FlutterFlowTheme.of(context)
-                              .labelMedium
-                              .override(
-                                font: GoogleFonts.spaceGrotesk(
-                                  fontWeight: FlutterFlowTheme.of(context)
-                                      .labelMedium
-                                      .fontWeight,
-                                  fontStyle: FlutterFlowTheme.of(context)
-                                      .labelMedium
-                                      .fontStyle,
-                                ),
-                                color:
-                                    FlutterFlowTheme.of(context).onBackground60,
-                                letterSpacing: 0.0,
-                                fontWeight: FlutterFlowTheme.of(context)
-                                    .labelMedium
-                                    .fontWeight,
-                                fontStyle: FlutterFlowTheme.of(context)
-                                    .labelMedium
-                                    .fontStyle,
-                                lineHeight: 1.3,
-                              ),
-                        ),
-                      ].divide(SizedBox(height: 16.0)),
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 80),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularPercentIndicator(
+                      percent: 0.0,
+                      radius: 12,
+                      lineWidth: 3,
+                      animation: true,
+                      animateFromLastPercent: true,
+                      progressColor: Colors.white,
+                      backgroundColor: Colors.white24,
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Loading best offers...',
+                      style: GoogleFonts.spaceGrotesk(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Container(
-              width: 0.0,
-              height: 0.0,
             ),
           ],
         ),

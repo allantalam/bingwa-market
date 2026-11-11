@@ -1,0 +1,6 @@
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/bingwa_icon.png"
+  adaptive_icon_background: "#004D32"
+  adaptive_icon_foreground: "assets/images/bingwa_icon.png"
