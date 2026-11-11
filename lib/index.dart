@@ -21,3 +21,5 @@ export '/pages/report_offer/report_offer_widget.dart'
     show ReportOfferWidget;
 export '/pages/submit_offer/submit_offer_widget.dart'
     show SubmitOfferWidget;
+export '/pages/seller_login/seller_login_widget.dart'
+    show SellerLoginWidget;

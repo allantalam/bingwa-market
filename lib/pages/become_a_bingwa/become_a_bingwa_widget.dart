@@ -1,4 +1,4 @@
-
+﻿
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -100,7 +100,7 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
     }
 
     if (!RegExp(r'^\d{6,7}$').hasMatch(value.trim())) {
-      return 'Till number must contain 6–7 digits';
+      return 'Till number must contain 6-7 digits';
     }
 
     return null;
@@ -138,10 +138,15 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+          backgroundColor:
+              isError ? Colors.red.shade700 : Colors.green.shade700,
         ),
       );
   }
+
+  // ============================================================
+  // BINGWA REGISTRATION
+  // ============================================================
 
   Future<void> _submitApplication() async {
     FocusScope.of(context).unfocus();
@@ -157,7 +162,6 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
     try {
       final email = _emailController.text.trim().toLowerCase();
 
-      // Create the seller's Firebase Authentication account.
       credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: _passwordController.text,
@@ -169,7 +173,6 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
         throw Exception('Firebase did not return a user account.');
       }
 
-      // Save the application using the Firebase UID as document ID.
       await FirebaseFirestore.instance
           .collection('sellers')
           .doc(user.uid)
@@ -213,6 +216,7 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
       );
 
       if (!mounted) return;
+
       context.goNamed(BrowseOffersWidget.routeName);
     } on FirebaseAuthException catch (e) {
       String message;
@@ -256,6 +260,238 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
       }
     }
   }
+
+  // ============================================================
+  // LOGIN: ADMIN FIRST, THEN BINGWA
+  // ============================================================
+
+  Future<String?> _loginSeller(String email, String password) async {
+    try {
+      final credential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+
+      final user = credential.user;
+
+      if (user == null) {
+        _showMessage('Unable to identify your account.');
+        return null;
+      }
+
+      final uid = user.uid;
+
+      // Always check the users collection FIRST.
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      final accountRole = userDoc.data()?['accountRole']
+          ?.toString()
+          .trim()
+          .toLowerCase();
+
+      debugPrint('LOGIN UID: $uid');
+      debugPrint('USER DOCUMENT EXISTS: ${userDoc.exists}');
+      debugPrint('ACCOUNT ROLE: $accountRole');
+
+      // ADMIN: No seller application is required.
+      if (userDoc.exists && accountRole == 'admin') {
+        debugPrint('ADMIN LOGIN SUCCESS');
+        return 'admin';
+      }
+
+      // Non-admin accounts must have a Bingwa application.
+      final sellerDoc = await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(uid)
+          .get();
+
+      if (!sellerDoc.exists) {
+        await FirebaseAuth.instance.signOut();
+
+        _showMessage('No Bingwa application was found for this account.');
+        return null;
+      }
+
+      final sellerData = sellerDoc.data()!;
+
+      final role = sellerData['accountRole']
+          ?.toString()
+          .trim()
+          .toLowerCase();
+
+      final status = sellerData['approvalStatus']
+          ?.toString()
+          .trim()
+          .toLowerCase();
+
+      if (role != 'seller') {
+        await FirebaseAuth.instance.signOut();
+
+        _showMessage('This account is not registered as a Bingwa.');
+        return null;
+      }
+
+      if (status != 'approved') {
+        await FirebaseAuth.instance.signOut();
+
+        _showMessage(
+          status == 'pending'
+              ? 'Your application is still awaiting admin approval.'
+              : 'Your Bingwa application has not been approved.',
+        );
+
+        return null;
+      }
+
+      return 'seller';
+    } on FirebaseAuthException catch (e) {
+      String message;
+
+      switch (e.code) {
+        case 'user-not-found':
+        case 'invalid-credential':
+        case 'wrong-password':
+          message = 'Incorrect email or password.';
+          break;
+        case 'invalid-email':
+          message = 'Enter a valid email address.';
+          break;
+        case 'too-many-requests':
+          message = 'Too many attempts. Please try again later.';
+          break;
+        default:
+          message = e.message ?? 'Login failed. Please try again.';
+      }
+
+      _showMessage(message);
+      return null;
+    } catch (e) {
+      debugPrint('LOGIN ERROR: $e');
+      _showMessage('Could not log in. Please check your connection.');
+      return null;
+    }
+  }
+
+  // ============================================================
+  // LOGIN DIALOG
+  // ============================================================
+
+  Future<void> _showLoginDialog() async {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    bool hidePassword = true;
+    bool isLoggingIn = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Bingwa Login'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email Address',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: hidePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          hidePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            hidePassword = !hidePassword;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoggingIn
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: isLoggingIn
+                      ? null
+                      : () async {
+                          if (emailController.text.trim().isEmpty ||
+                              passwordController.text.isEmpty) {
+                            _showMessage('Enter your email and password.');
+                            return;
+                          }
+
+                          setDialogState(() => isLoggingIn = true);
+
+                          final accountType = await _loginSeller(
+                            emailController.text,
+                            passwordController.text,
+                          );
+
+                          if (!mounted) return;
+
+                          if (accountType != null) {
+                            Navigator.of(dialogContext).pop();
+
+                            if (accountType == 'admin') {
+                              context.goNamed('AdminOverview');
+                            } else {
+                              context.goNamed(
+                                BingwaDashboardWidget.routeName,
+                              );
+                            }
+                          } else {
+                            setDialogState(() => isLoggingIn = false);
+                          }
+                        },
+                  child: isLoggingIn
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text('Login'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    emailController.dispose();
+    passwordController.dispose();
+  }
+
+  // ============================================================
+  // FORM FIELD
+  // ============================================================
 
   Widget _buildField({
     required String label,
@@ -312,6 +548,10 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
     );
   }
 
+  // ============================================================
+  // FEATURE ITEM
+  // ============================================================
+
   Widget _featureItem({
     required IconData icon,
     required String title,
@@ -359,6 +599,10 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
     );
   }
 
+  // ============================================================
+  // PAGE UI
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
     final theme = FlutterFlowTheme.of(context);
@@ -403,6 +647,22 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: Center(
+                    child: TextButton(
+                      onPressed: _showLoginDialog,
+                      child: Text(
+                        'Already a Bingwa? Login',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          color: theme.primary,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
 
@@ -522,7 +782,7 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
 
                         _buildField(
                           label: 'M-Pesa Till Number',
-                          hint: 'Enter your 6–7 digit Till number',
+                          hint: 'Enter your 6-7 digit Till number',
                           controller: _tillController,
                           icon: Icons.payments_outlined,
                           keyboardType: TextInputType.number,
@@ -530,6 +790,7 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
                         ),
 
                         const SizedBox(height: 24),
+
                         Text(
                           'Account Security',
                           style: GoogleFonts.plusJakartaSans(
@@ -554,7 +815,9 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
                                   : Icons.visibility,
                             ),
                             onPressed: () {
-                              setState(() => _hidePassword = !_hidePassword);
+                              setState(() {
+                                _hidePassword = !_hidePassword;
+                              });
                             },
                           ),
                         ),
@@ -575,7 +838,8 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
                             ),
                             onPressed: () {
                               setState(() {
-                                _hideConfirmPassword = !_hideConfirmPassword;
+                                _hideConfirmPassword =
+                                    !_hideConfirmPassword;
                               });
                             },
                           ),
@@ -666,6 +930,7 @@ class _BecomeABingwaWidgetState extends State<BecomeABingwaWidget> {
                             ),
                           ),
                         ),
+
                         const SizedBox(height: 24),
                       ],
                     ),

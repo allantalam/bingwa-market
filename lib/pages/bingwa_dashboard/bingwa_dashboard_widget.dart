@@ -1,17 +1,16 @@
 import '/components/button/button_widget.dart';
 import '/components/dash_stat/dash_stat_widget.dart';
 import '/components/offer_status_row/offer_status_row_widget.dart';
-import '/pages/submit_offer/submit_offer_widget.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import 'bingwa_dashboard_model.dart';
 export 'bingwa_dashboard_model.dart';
+import '/pages/submit_offer/submit_offer_widget.dart';
 
 class BingwaDashboardWidget extends StatefulWidget {
   const BingwaDashboardWidget({super.key});
@@ -68,7 +67,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
-                      padding: EdgeInsets.all(24.0),
+                      padding: const EdgeInsets.all(24.0),
                       child: Container(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -135,7 +134,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                             lineHeight: 1.4,
                                           ),
                                     ),
-                                  ].divide(SizedBox(height: 4.0)),
+                                  ].divide(const SizedBox(height: 4.0)),
                                 ),
                                 FlutterFlowIconButton(
                                   borderRadius: 8.0,
@@ -163,7 +162,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                 ),
                               ),
                               child: Padding(
-                                padding: EdgeInsets.all(16.0),
+                                padding: const EdgeInsets.all(16.0),
                                 child: Container(
                                   child: Row(
                                     mainAxisSize: MainAxisSize.max,
@@ -201,12 +200,12 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                               lineHeight: 1.3,
                                             ),
                                       ),
-                                    ].divide(SizedBox(width: 8.0)),
+                                    ].divide(const SizedBox(width: 8.0)),
                                   ),
                                 ),
                               ),
                             ),
-                          ].divide(SizedBox(height: 16.0)),
+                          ].divide(const SizedBox(height: 16.0)),
                         ),
                       ),
                     ),
@@ -220,100 +219,130 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                   ],
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseAuth.instance.currentUser == null
+                    ? const Stream.empty()
+                    : FirebaseFirestore.instance
+                        .collection('offers')
+                        .where(
+                          'sellerId',
+                          isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                        )
+                        .snapshots(),
+                builder: (context, snapshot) {
+                  final offers = snapshot.data?.docs ?? [];
+                  final totalOffers = offers.length;
+                  final activeOffers = offers.where((doc) {
+                    final data = doc.data();
+                    return (data['approvalStatus']?.toString().toLowerCase() ==
+                            'approved') &&
+                        data['isActive'] == true;
+                  }).length;
+                  final pendingOffers = offers.where((doc) =>
+                      doc.data()['approvalStatus']
+                          ?.toString()
+                          .toLowerCase() ==
+                      'pending').length;
+                  final rejectedOffers = offers.where((doc) =>
+                      doc.data()['approvalStatus']
+                          ?.toString()
+                          .toLowerCase() ==
+                      'rejected').length;
+
+                  String statValue(int value) =>
+                      snapshot.hasError ? '—' : value.toString();
+
+                  return Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          flex: 1,
-                          child: wrapWithModel(
-                            model: _model.dashStatModel1,
-                            updateCallback: () => safeSetState(() {}),
-                            child: DashStatWidget(
-                              icon: Icon(
-                                Icons.payments_rounded,
-                                color: FlutterFlowTheme.of(context).primary,
-                                size: 20.0,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DashStatWidget(
+                                icon: Icon(
+                                  Icons.local_offer_rounded,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  size: 20.0,
+                                ),
+                                label: 'Total Offers',
+                                tone: FlutterFlowTheme.of(context).primary,
+                                value: snapshot.connectionState ==
+                                        ConnectionState.waiting
+                                    ? '...'
+                                    : statValue(totalOffers),
                               ),
-                              label: 'Total Sales',
-                              tone: FlutterFlowTheme.of(context).primary,
-                              value: 'KSh 12,450',
+                            ),
+                            const SizedBox(width: 16.0),
+                            Expanded(
+                              child: DashStatWidget(
+                                icon: Icon(
+                                  Icons.check_circle_rounded,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  size: 20.0,
+                                ),
+                                label: 'Active Offers',
+                                tone: FlutterFlowTheme.of(context).tertiary,
+                                value: snapshot.connectionState ==
+                                        ConnectionState.waiting
+                                    ? '...'
+                                    : statValue(activeOffers),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DashStatWidget(
+                                icon: Icon(
+                                  Icons.history_toggle_off_rounded,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  size: 20.0,
+                                ),
+                                label: 'Pending Review',
+                                tone: FlutterFlowTheme.of(context).warning,
+                                value: snapshot.connectionState ==
+                                        ConnectionState.waiting
+                                    ? '...'
+                                    : statValue(pendingOffers),
+                              ),
+                            ),
+                            const SizedBox(width: 16.0),
+                            Expanded(
+                              child: DashStatWidget(
+                                icon: Icon(
+                                  Icons.cancel_rounded,
+                                  color: FlutterFlowTheme.of(context).primary,
+                                  size: 20.0,
+                                ),
+                                label: 'Rejected Offers',
+                                tone: FlutterFlowTheme.of(context).error,
+                                value: snapshot.connectionState ==
+                                        ConnectionState.waiting
+                                    ? '...'
+                                    : statValue(rejectedOffers),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (snapshot.hasError)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              'Unable to load offer statistics.',
+                              style: FlutterFlowTheme.of(context).bodySmall,
                             ),
                           ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: wrapWithModel(
-                            model: _model.dashStatModel2,
-                            updateCallback: () => safeSetState(() {}),
-                            child: DashStatWidget(
-                              icon: Icon(
-                                Icons.local_offer_rounded,
-                                color: FlutterFlowTheme.of(context).primary,
-                                size: 20.0,
-                              ),
-                              label: 'Active Offers',
-                              tone: FlutterFlowTheme.of(context).tertiary,
-                              value: '8',
-                            ),
-                          ),
-                        ),
-                      ].divide(SizedBox(width: 16.0)),
+                      ],
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: wrapWithModel(
-                            model: _model.dashStatModel3,
-                            updateCallback: () => safeSetState(() {}),
-                            child: DashStatWidget(
-                              icon: Icon(
-                                Icons.history_toggle_off_rounded,
-                                color: FlutterFlowTheme.of(context).primary,
-                                size: 20.0,
-                              ),
-                              label: 'Pending Review',
-                              tone: FlutterFlowTheme.of(context).warning,
-                              value: '3',
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: 1,
-                          child: wrapWithModel(
-                            model: _model.dashStatModel4,
-                            updateCallback: () => safeSetState(() {}),
-                            child: DashStatWidget(
-                              icon: Icon(
-                                Icons.visibility_rounded,
-                                color: FlutterFlowTheme.of(context).primary,
-                                size: 20.0,
-                              ),
-                              label: 'Profile Views',
-                              tone: FlutterFlowTheme.of(context).info,
-                              value: '1,204',
-                            ),
-                          ),
-                        ),
-                      ].divide(SizedBox(width: 16.0)),
-                    ),
-                  ].divide(SizedBox(height: 16.0)),
-                ),
+                  );
+                },
               ),
               Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 24.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -337,7 +366,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                         loading: false,
                         disabled: false,
                         onTap: () {
-                          context.goNamed(SubmitOfferWidget.routeName);
+                        context.pushNamed(SubmitOfferWidget.routeName);
                         },
                       ),
                     ),
@@ -360,11 +389,11 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                         disabled: false,
                       ),
                     ),
-                  ].divide(SizedBox(height: 16.0)),
+                  ].divide(const SizedBox(height: 16.0)),
                 ),
               ),
               Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 24.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -418,138 +447,100 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                         ),
                       ],
                     ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        wrapWithModel(
-                          model: _model.offerStatusRowModel1,
-                          updateCallback: () => safeSetState(() {}),
-                          child: OfferStatusRowWidget(
-                            price: '99',
-                            status: 'Published',
-                            statusColor: FlutterFlowTheme.of(context).success,
-                            title: '1GB Daily Bundle',
-                          ),
-                        ),
-                        wrapWithModel(
-                          model: _model.offerStatusRowModel2,
-                          updateCallback: () => safeSetState(() {}),
-                          child: OfferStatusRowWidget(
-                            price: '150',
-                            status: 'Pending Review',
-                            statusColor: FlutterFlowTheme.of(context).warning,
-                            title: 'Weekend Minutes Special',
-                          ),
-                        ),
-                        wrapWithModel(
-                          model: _model.offerStatusRowModel3,
-                          updateCallback: () => safeSetState(() {}),
-                          child: OfferStatusRowWidget(
-                            price: '50',
-                            status: 'Rejected',
-                            statusColor: FlutterFlowTheme.of(context).error,
-                            title: 'Unlimited SMS Weekly',
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: FlutterFlowTheme.of(context).error5,
-                            borderRadius: BorderRadius.circular(12.0),
-                            shape: BoxShape.rectangle,
-                            border: Border.all(
-                              color: FlutterFlowTheme.of(context).error20,
-                              width: 1.0,
+                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseAuth.instance.currentUser == null
+                          ? const Stream.empty()
+                          : FirebaseFirestore.instance
+                              .collection('offers')
+                              .where(
+                                'sellerId',
+                                isEqualTo:
+                                    FirebaseAuth.instance.currentUser!.uid,
+                              )
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'Unable to load your submissions. Please try again.',
+                              style: FlutterFlowTheme.of(context).bodySmall,
                             ),
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Container(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.max,
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.info_rounded,
-                                        color: FlutterFlowTheme.of(context)
-                                            .onError,
-                                        size: 14.0,
-                                      ),
-                                      Text(
-                                        'Rejection Reason: SMS Weekly',
-                                        style: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .override(
-                                              font: GoogleFonts.spaceGrotesk(
-                                                fontWeight: FontWeight.bold,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .labelSmall
-                                                        .fontStyle,
-                                              ),
-                                              color:
-                                                  FlutterFlowTheme.of(context)
-                                                      .onError,
-                                              letterSpacing: 0.0,
-                                              fontWeight: FontWeight.bold,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelSmall
-                                                      .fontStyle,
-                                              lineHeight: 1.2,
-                                            ),
-                                      ),
-                                    ].divide(SizedBox(width: 4.0)),
-                                  ),
-                                  Text(
-                                    'Please update the price to match the current market rate for SMS bundles.',
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodySmall
-                                        .override(
-                                          font: GoogleFonts.inter(
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodySmall
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodySmall
-                                                    .fontStyle,
-                                          ),
-                                          color: FlutterFlowTheme.of(context)
-                                              .onError,
-                                          letterSpacing: 0.0,
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodySmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodySmall
-                                                  .fontStyle,
-                                          lineHeight: 1.4,
-                                        ),
-                                  ),
-                                ].divide(SizedBox(height: 4.0)),
-                              ),
+                          );
+                        }
+
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Center(
+                              child: CircularProgressIndicator(),
                             ),
-                          ),
-                        ),
-                      ].divide(SizedBox(height: 8.0)),
+                          );
+                        }
+
+                        final offers = [...?snapshot.data?.docs];
+                        offers.sort((a, b) {
+                          final aDate = a.data()['createdAt'];
+                          final bDate = b.data()['createdAt'];
+                          final aMillis = aDate is Timestamp
+                              ? aDate.millisecondsSinceEpoch
+                              : 0;
+                          final bMillis = bDate is Timestamp
+                              ? bDate.millisecondsSinceEpoch
+                              : 0;
+                          return bMillis.compareTo(aMillis);
+                        });
+
+                        if (offers.isEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'You have not submitted any offers yet.',
+                              style: FlutterFlowTheme.of(context).bodyMedium,
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: offers.take(5).map((offer) {
+                            final data = offer.data();
+                            final title =
+                                data['title']?.toString().trim().isNotEmpty ==
+                                        true
+                                    ? data['title'].toString()
+                                    : 'Untitled offer';
+                            final rawStatus =
+                                data['approvalStatus']?.toString().toLowerCase() ??
+                                    'pending';
+                            final status = rawStatus == 'approved'
+                                ? 'Published'
+                                : rawStatus == 'rejected'
+                                    ? 'Rejected'
+                                    : 'Pending Review';
+                            final statusColor = rawStatus == 'approved'
+                                ? FlutterFlowTheme.of(context).success
+                                : rawStatus == 'rejected'
+                                    ? FlutterFlowTheme.of(context).error
+                                    : FlutterFlowTheme.of(context).warning;
+                            final price = data['price']?.toString() ?? '—';
+
+                            return OfferStatusRowWidget(
+                              price: price,
+                              status: status,
+                              statusColor: statusColor,
+                              title: title,
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
-                  ].divide(SizedBox(height: 16.0)),
+                  ].divide(const SizedBox(height: 16.0)),
                 ),
               ),
               Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 24.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -572,7 +563,49 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                             lineHeight: 1.4,
                           ),
                     ),
-                    ClipRRect(
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseAuth.instance.currentUser == null
+                          ? null
+                          : FirebaseFirestore.instance
+                              .collection('sellers')
+                              .doc(FirebaseAuth.instance.currentUser!.uid)
+                              .snapshots(),
+                      builder: (context, snapshot) {
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        final sellerData = snapshot.data?.data();
+
+                        var businessName = 'Loading...';
+                        var tillNumber = 'Loading...';
+
+                        if (currentUser == null) {
+                          businessName = 'Not signed in';
+                          tillNumber = 'Not signed in';
+                        } else if (snapshot.hasError) {
+                          businessName = 'Unable to load';
+                          tillNumber = 'Unable to load';
+                        } else if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          businessName = 'Loading...';
+                          tillNumber = 'Loading...';
+                        } else if (snapshot.data?.exists != true) {
+                          businessName = 'Seller profile not found';
+                          tillNumber = 'Seller profile not found';
+                        } else {
+                          final savedBusinessName =
+                              sellerData?['businessName']?.toString().trim();
+                          final savedTillNumber =
+                              sellerData?['tillNumber']?.toString().trim();
+
+                          businessName =
+                              savedBusinessName?.isNotEmpty == true
+                                  ? savedBusinessName!
+                                  : 'Not provided';
+                          tillNumber = savedTillNumber?.isNotEmpty == true
+                              ? savedTillNumber!
+                              : 'Not provided';
+                        }
+
+                        return ClipRRect(
                       borderRadius: BorderRadius.circular(16.0),
                       child: Container(
                         decoration: BoxDecoration(
@@ -592,7 +625,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                           children: [
                             Container(
                               child: Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     24.0, 16.0, 24.0, 16.0),
                                 child: Container(
                                   child: Row(
@@ -654,7 +687,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                                       ),
                                             ),
                                             Text(
-                                              'Bingwa Telecom Solutions',
+                                              businessName,
                                               style:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -679,7 +712,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                                         lineHeight: 1.5,
                                                       ),
                                             ),
-                                          ].divide(SizedBox(height: 4.0)),
+                                          ].divide(const SizedBox(height: 4.0)),
                                         ),
                                       ),
                                       Icon(
@@ -688,14 +721,14 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                             .secondaryText,
                                         size: 24.0,
                                       ),
-                                    ].divide(SizedBox(width: 16.0)),
+                                    ].divide(const SizedBox(width: 16.0)),
                                   ),
                                 ),
                               ),
                             ),
                             Container(
                               child: Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     24.0, 16.0, 24.0, 16.0),
                                 child: Container(
                                   child: Row(
@@ -757,7 +790,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                                       ),
                                             ),
                                             Text(
-                                              '5921004',
+                                              tillNumber,
                                               style:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -782,7 +815,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                                         lineHeight: 1.5,
                                                       ),
                                             ),
-                                          ].divide(SizedBox(height: 4.0)),
+                                          ].divide(const SizedBox(height: 4.0)),
                                         ),
                                       ),
                                       Icon(
@@ -791,7 +824,7 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                                             .secondaryText,
                                         size: 24.0,
                                       ),
-                                    ].divide(SizedBox(width: 16.0)),
+                                    ].divide(const SizedBox(width: 16.0)),
                                   ),
                                 ),
                               ),
@@ -799,8 +832,10 @@ class _BingwaDashboardWidgetState extends State<BingwaDashboardWidget> {
                           ],
                         ),
                       ),
+                        );
+                      },
                     ),
-                  ].divide(SizedBox(height: 16.0)),
+                  ].divide(const SizedBox(height: 16.0)),
                 ),
               ),
               Container(

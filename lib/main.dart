@@ -6,9 +6,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
-import 'flutter_flow/nav/nav.dart';
 import 'firebase_options.dart';
-import 'index.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,6 +77,13 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
+      builder: (context, child) {
+  return SafeArea(
+    top: true,
+    bottom: false,
+    child: child ?? const SizedBox.shrink(),
+  );
+},
       debugShowCheckedModeBanner: false,
       title: 'Bingwa Market',
 

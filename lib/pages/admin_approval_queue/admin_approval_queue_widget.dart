@@ -1,17 +1,5 @@
-import '/components/application_card/application_card_widget.dart';
-import '/components/approval_tab/approval_tab_widget.dart';
-import '/components/button/button_widget.dart';
-import '/components/offer_review_row/offer_review_row_widget.dart';
-import '/flutter_flow/flutter_flow_icon_button.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import 'admin_approval_queue_model.dart';
-export 'admin_approval_queue_model.dart';
 
 class AdminApprovalQueueWidget extends StatefulWidget {
   const AdminApprovalQueueWidget({super.key});
@@ -24,619 +12,385 @@ class AdminApprovalQueueWidget extends StatefulWidget {
       _AdminApprovalQueueWidgetState();
 }
 
-class _AdminApprovalQueueWidgetState extends State<AdminApprovalQueueWidget> {
-  late AdminApprovalQueueModel _model;
+class _AdminApprovalQueueWidgetState
+    extends State<AdminApprovalQueueWidget> {
+  final Set<String> _processingIds = {};
 
-  final scaffoldKey = GlobalKey<ScaffoldState>();
-
-  @override
-  void initState() {
-    super.initState();
-    _model = createModel(context, () => AdminApprovalQueueModel());
+  Future<bool> _confirmAction(String title, String message) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Confirm'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
-  @override
-  void dispose() {
-    _model.dispose();
+  void _showMessage(String message, {bool error = false}) {
+    if (!mounted) return;
 
-    super.dispose();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: error ? Colors.red : Colors.green,
+        ),
+      );
+  }
+
+  Future<void> _reviewSeller(
+    String sellerId,
+    String status,
+  ) async {
+    final approved = status == 'approved';
+
+    final confirmed = await _confirmAction(
+      approved ? 'Approve Bingwa?' : 'Reject application?',
+      approved
+          ? 'This seller will be allowed to access the Bingwa Dashboard.'
+          : 'This seller application will be rejected.',
+    );
+
+    if (!confirmed || !mounted) return;
+
+    setState(() => _processingIds.add(sellerId));
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('sellers')
+          .doc(sellerId)
+          .update({'approvalStatus': status});
+
+      _showMessage(
+        approved
+            ? 'Bingwa application approved.'
+            : 'Bingwa application rejected.',
+      );
+    } catch (e) {
+      _showMessage('Could not update application: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() => _processingIds.remove(sellerId));
+      }
+    }
+  }
+
+  Future<void> _reviewOffer(
+    String offerId,
+    String status,
+  ) async {
+    final approved = status == 'approved';
+
+    final confirmed = await _confirmAction(
+      approved ? 'Approve offer?' : 'Reject offer?',
+      approved
+          ? 'This offer will become active and visible to customers.'
+          : 'This offer will be rejected and remain inactive.',
+    );
+
+    if (!confirmed || !mounted) return;
+
+    setState(() => _processingIds.add(offerId));
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('offers')
+          .doc(offerId)
+          .update({
+        'approvalStatus': status,
+        'isActive': approved,
+        'isVerified': approved,
+        'lastVerified': FieldValue.serverTimestamp(),
+      });
+
+      _showMessage(
+        approved ? 'Offer approved and activated.' : 'Offer rejected.',
+      );
+    } catch (e) {
+      _showMessage('Could not update offer: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() => _processingIds.remove(offerId));
+      }
+    }
+  }
+
+  Widget _sectionHeading(String title, int count) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Text(
+            '$count pending',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.secondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSellerQueue() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('sellers')
+          .where('approvalStatus', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _errorMessage('Unable to load Bingwa applications.');
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final sellers = snapshot.data!.docs;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sectionHeading('Pending Bingwa Applications', sellers.length),
+            if (sellers.isEmpty)
+              _emptyMessage('No pending Bingwa applications.')
+            else
+              ...sellers.map(_buildSellerCard),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildOfferQueue() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('offers')
+          .where('approvalStatus', isEqualTo: 'pending')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _errorMessage('Unable to load pending offers.');
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final offers = snapshot.data!.docs;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sectionHeading('Pending Offer Reviews', offers.length),
+            if (offers.isEmpty)
+              _emptyMessage('No pending offers.')
+            else
+              ...offers.map(_buildOfferCard),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSellerCard(
+    QueryDocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final data = document.data();
+    final id = document.id;
+    final processing = _processingIds.contains(id);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              data['businessName']?.toString() ?? 'Unnamed business',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _detailLine('Applicant', data['fullName']),
+            _detailLine('Email', data['email']),
+            _detailLine('Phone', data['phoneNumber']),
+            _detailLine('M-Pesa Till', data['tillNumber']),
+            _detailLine('Business', data['businessInformation']),
+            const SizedBox(height: 12),
+            _actionButtons(
+              processing: processing,
+              onApprove: () => _reviewSeller(id, 'approved'),
+              onReject: () => _reviewSeller(id, 'rejected'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfferCard(
+    QueryDocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final data = document.data();
+    final id = document.id;
+    final processing = _processingIds.contains(id);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              data['title']?.toString() ?? 'Untitled offer',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _detailLine('Bingwa', data['sellerName']),
+            _detailLine('Category', data['category']),
+            _detailLine('Price', 'KSh ${data['price'] ?? '-'}'),
+            _detailLine('Details', data['detail']),
+            _detailLine('Validity', data['validity']),
+            const SizedBox(height: 12),
+            _actionButtons(
+              processing: processing,
+              onApprove: () => _reviewOffer(id, 'approved'),
+              onReject: () => _reviewOffer(id, 'rejected'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailLine(String label, dynamic value) {
+    final text = value?.toString().trim() ?? '';
+
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Text(
+        '$label: $text',
+        style: const TextStyle(fontSize: 13),
+      ),
+    );
+  }
+
+  Widget _actionButtons({
+    required bool processing,
+    required VoidCallback onApprove,
+    required VoidCallback onReject,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: processing ? null : onReject,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Reject'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: FilledButton(
+            onPressed: processing ? null : onApprove,
+            child: processing
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Approve'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyMessage(String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Text(
+          message,
+          style: TextStyle(color: Theme.of(context).hintColor),
+        ),
+      ),
+    );
+  }
+
+  Widget _errorMessage(String message) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Text(
+        message,
+        style: const TextStyle(color: Colors.red),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: Scaffold(
-        key: scaffoldKey,
-        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        body: Column(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                color: FlutterFlowTheme.of(context).secondaryBackground,
-                shape: BoxShape.rectangle,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding:
-                        EdgeInsetsDirectional.fromSTEB(16.0, 24.0, 16.0, 16.0),
-                    child: Container(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Approval Queue',
-                                    style: FlutterFlowTheme.of(context)
-                                        .headlineMedium
-                                        .override(
-                                          font: GoogleFonts.plusJakartaSans(
-                                            fontWeight: FontWeight.bold,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .headlineMedium
-                                                    .fontStyle,
-                                          ),
-                                          color: FlutterFlowTheme.of(context)
-                                              .primaryText,
-                                          letterSpacing: 0.0,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .headlineMedium
-                                                  .fontStyle,
-                                          lineHeight: 1.25,
-                                        ),
-                                  ),
-                                  Text(
-                                    'Marketplace Moderation',
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodySmall
-                                        .override(
-                                          font: GoogleFonts.inter(
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodySmall
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodySmall
-                                                    .fontStyle,
-                                          ),
-                                          color: FlutterFlowTheme.of(context)
-                                              .secondaryText,
-                                          letterSpacing: 0.0,
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodySmall
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodySmall
-                                                  .fontStyle,
-                                          lineHeight: 1.4,
-                                        ),
-                                  ),
-                                ].divide(SizedBox(height: 4.0)),
-                              ),
-                              FlutterFlowIconButton(
-                                borderRadius: 8.0,
-                                buttonSize: 40.0,
-                                fillColor: Colors.transparent,
-                                icon: Icon(
-                                  Icons.history_rounded,
-                                  color: FlutterFlowTheme.of(context)
-                                      .secondaryText,
-                                  size: 24.0,
-                                ),
-                                onPressed: () {
-                                  print('IconButton pressed ...');
-                                },
-                              ),
-                            ],
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: wrapWithModel(
-                                  model: _model.approvalTabModel1,
-                                  updateCallback: () => safeSetState(() {}),
-                                  child: ApprovalTabWidget(
-                                    label: 'Bingwas (4)',
-                                    selected: true,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 1,
-                                child: wrapWithModel(
-                                  model: _model.approvalTabModel2,
-                                  updateCallback: () => safeSetState(() {}),
-                                  child: ApprovalTabWidget(
-                                    label: 'Offers (12)',
-                                    selected: true,
-                                  ),
-                                ),
-                              ),
-                            ].divide(SizedBox(width: 0.0)),
-                          ),
-                        ].divide(SizedBox(height: 16.0)),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: 1.0,
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context).alternate,
-                      shape: BoxShape.rectangle,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              flex: 1,
-              child: Container(
-                child: SingleChildScrollView(
-                  primary: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Container(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.max,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'New Applications',
-                                        style: FlutterFlowTheme.of(context)
-                                            .titleMedium
-                                            .override(
-                                              font: GoogleFonts.plusJakartaSans(
-                                                fontWeight: FontWeight.bold,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .titleMedium
-                                                        .fontStyle,
-                                              ),
-                                              letterSpacing: 0.0,
-                                              fontWeight: FontWeight.bold,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .titleMedium
-                                                      .fontStyle,
-                                              lineHeight: 1.4,
-                                            ),
-                                      ),
-                                      Text(
-                                        '4 Pending',
-                                        style: FlutterFlowTheme.of(context)
-                                            .labelMedium
-                                            .override(
-                                              font: GoogleFonts.spaceGrotesk(
-                                                fontWeight:
-                                                    FlutterFlowTheme.of(context)
-                                                        .labelMedium
-                                                        .fontWeight,
-                                                fontStyle:
-                                                    FlutterFlowTheme.of(context)
-                                                        .labelMedium
-                                                        .fontStyle,
-                                              ),
-                                              color:
-                                                  FlutterFlowTheme.of(context)
-                                                      .secondaryText,
-                                              letterSpacing: 0.0,
-                                              fontWeight:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelMedium
-                                                      .fontWeight,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelMedium
-                                                      .fontStyle,
-                                              lineHeight: 1.3,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                  wrapWithModel(
-                                    model: _model.applicationCardModel1,
-                                    updateCallback: () => safeSetState(() {}),
-                                    child: ApplicationCardWidget(
-                                      business: 'Kamau Bundles Ltd',
-                                      date: '2 hours ago',
-                                      name: 'John Kamau',
-                                      status: 'Status',
-                                    ),
-                                  ),
-                                  wrapWithModel(
-                                    model: _model.applicationCardModel2,
-                                    updateCallback: () => safeSetState(() {}),
-                                    child: ApplicationCardWidget(
-                                      business: 'Pwani Data Point',
-                                      date: '5 hours ago',
-                                      name: 'Sarah Chengo',
-                                      status: 'Status',
-                                    ),
-                                  ),
-                                  wrapWithModel(
-                                    model: _model.applicationCardModel3,
-                                    updateCallback: () => safeSetState(() {}),
-                                    child: ApplicationCardWidget(
-                                      business: 'Omondi Telecoms',
-                                      date: 'Yesterday',
-                                      name: 'David Omondi',
-                                      status: 'Status',
-                                    ),
-                                  ),
-                                ].divide(SizedBox(height: 16.0)),
-                              ),
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    'Pending Offer Reviews',
-                                    style: FlutterFlowTheme.of(context)
-                                        .titleMedium
-                                        .override(
-                                          font: GoogleFonts.plusJakartaSans(
-                                            fontWeight: FontWeight.bold,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .titleMedium
-                                                    .fontStyle,
-                                          ),
-                                          letterSpacing: 0.0,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .titleMedium
-                                                  .fontStyle,
-                                          lineHeight: 1.4,
-                                        ),
-                                  ),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(16.0),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius:
-                                            BorderRadius.circular(16.0),
-                                        shape: BoxShape.rectangle,
-                                        border: Border.all(
-                                          color: FlutterFlowTheme.of(context)
-                                              .alternate,
-                                          width: 1.0,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          wrapWithModel(
-                                            model: _model.offerReviewRowModel1,
-                                            updateCallback: () =>
-                                                safeSetState(() {}),
-                                            child: OfferReviewRowWidget(
-                                              bingwa: 'Kamau Bundles',
-                                              price: '500',
-                                              title: 'Weekly 5GB + WhatsApp',
-                                              type: 'data',
-                                            ),
-                                          ),
-                                          wrapWithModel(
-                                            model: _model.offerReviewRowModel2,
-                                            updateCallback: () =>
-                                                safeSetState(() {}),
-                                            child: OfferReviewRowWidget(
-                                              bingwa: 'Pwani Data',
-                                              price: '150',
-                                              title: '100 Minutes All Networks',
-                                              type: 'minutes',
-                                            ),
-                                          ),
-                                          wrapWithModel(
-                                            model: _model.offerReviewRowModel3,
-                                            updateCallback: () =>
-                                                safeSetState(() {}),
-                                            child: OfferReviewRowWidget(
-                                              bingwa: 'Omondi Telecoms',
-                                              price: '20',
-                                              title: 'Daily Unlimited SMS',
-                                              type: 'SMS',
-                                            ),
-                                          ),
-                                          wrapWithModel(
-                                            model: _model.offerReviewRowModel4,
-                                            updateCallback: () =>
-                                                safeSetState(() {}),
-                                            child: OfferReviewRowWidget(
-                                              bingwa: 'Kamau Bundles',
-                                              price: '1,200',
-                                              title: 'Monthly 20GB Super',
-                                              type: 'data',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  wrapWithModel(
-                                    model: _model.buttonModel,
-                                    updateCallback: () => safeSetState(() {}),
-                                    child: ButtonWidget(
-                                      iconPresent: false,
-                                      iconEndPresent: false,
-                                      content: 'View All 12 Offers',
-                                      variant: 'ghost',
-                                      size: 'medium',
-                                      fullWidth: true,
-                                      loading: false,
-                                      disabled: false,
-                                    ),
-                                  ),
-                                ].divide(SizedBox(height: 16.0)),
-                              ),
-                            ].divide(SizedBox(height: 24.0)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                color: FlutterFlowTheme.of(context).secondaryBackground,
-                shape: BoxShape.rectangle,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    height: 1.0,
-                    decoration: BoxDecoration(
-                      color: FlutterFlowTheme.of(context).alternate,
-                      shape: BoxShape.rectangle,
-                    ),
-                  ),
-                  Padding(
-                    padding:
-                        EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
-                    child: Container(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.max,
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '82',
-                                style: FlutterFlowTheme.of(context)
-                                    .titleMedium
-                                    .override(
-                                      font: GoogleFonts.plusJakartaSans(
-                                        fontWeight: FontWeight.bold,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleMedium
-                                            .fontStyle,
-                                      ),
-                                      color:
-                                          FlutterFlowTheme.of(context).primary,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FontWeight.bold,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleMedium
-                                          .fontStyle,
-                                      lineHeight: 1.4,
-                                    ),
-                              ),
-                              Text(
-                                'Approved',
-                                style: FlutterFlowTheme.of(context)
-                                    .labelSmall
-                                    .override(
-                                      font: GoogleFonts.spaceGrotesk(
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .fontStyle,
-                                      ),
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryText,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .labelSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .labelSmall
-                                          .fontStyle,
-                                      lineHeight: 1.2,
-                                    ),
-                              ),
-                            ].divide(SizedBox(height: 4.0)),
-                          ),
-                          Container(
-                            width: 1.0,
-                            height: 24.0,
-                            decoration: BoxDecoration(
-                              color: FlutterFlowTheme.of(context).alternate,
-                            ),
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '16',
-                                style: FlutterFlowTheme.of(context)
-                                    .titleMedium
-                                    .override(
-                                      font: GoogleFonts.plusJakartaSans(
-                                        fontWeight: FontWeight.bold,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleMedium
-                                            .fontStyle,
-                                      ),
-                                      color: FlutterFlowTheme.of(context)
-                                          .onSurface,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FontWeight.bold,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleMedium
-                                          .fontStyle,
-                                      lineHeight: 1.4,
-                                    ),
-                              ),
-                              Text(
-                                'Pending',
-                                style: FlutterFlowTheme.of(context)
-                                    .labelSmall
-                                    .override(
-                                      font: GoogleFonts.spaceGrotesk(
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .fontStyle,
-                                      ),
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryText,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .labelSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .labelSmall
-                                          .fontStyle,
-                                      lineHeight: 1.2,
-                                    ),
-                              ),
-                            ].divide(SizedBox(height: 4.0)),
-                          ),
-                          Container(
-                            width: 1.0,
-                            height: 24.0,
-                            decoration: BoxDecoration(
-                              color: FlutterFlowTheme.of(context).alternate,
-                            ),
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                '3',
-                                style: FlutterFlowTheme.of(context)
-                                    .titleMedium
-                                    .override(
-                                      font: GoogleFonts.plusJakartaSans(
-                                        fontWeight: FontWeight.bold,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .titleMedium
-                                            .fontStyle,
-                                      ),
-                                      color: FlutterFlowTheme.of(context).error,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FontWeight.bold,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .titleMedium
-                                          .fontStyle,
-                                      lineHeight: 1.4,
-                                    ),
-                              ),
-                              Text(
-                                'Reported',
-                                style: FlutterFlowTheme.of(context)
-                                    .labelSmall
-                                    .override(
-                                      font: GoogleFonts.spaceGrotesk(
-                                        fontWeight: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .fontWeight,
-                                        fontStyle: FlutterFlowTheme.of(context)
-                                            .labelSmall
-                                            .fontStyle,
-                                      ),
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryText,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FlutterFlowTheme.of(context)
-                                          .labelSmall
-                                          .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
-                                          .labelSmall
-                                          .fontStyle,
-                                      lineHeight: 1.2,
-                                    ),
-                              ),
-                            ].divide(SizedBox(height: 4.0)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            Text('Approval Queue'),
+            Text(
+              'Marketplace Moderation',
+              style: TextStyle(fontSize: 12),
             ),
           ],
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildSellerQueue(),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
+              _buildOfferQueue(),
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );

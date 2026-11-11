@@ -66,6 +66,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => const BecomeABingwaWidget(),
         ),
         FFRoute(
+          name: SellerLoginWidget.routeName,
+          path: SellerLoginWidget.routePath,
+          builder: (context, params) => const SellerLoginWidget(),
+),
+        FFRoute(
           name: SubmitOfferWidget.routeName,
           path: SubmitOfferWidget.routePath,
           builder: (context, params) => const SubmitOfferWidget(),
